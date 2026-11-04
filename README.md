@@ -33,9 +33,16 @@ Die App kann im Browser unter der URL http://localhost:8080 betrachtet werden.
 
 
 ### Inbetriebnahme mit Docker Container
-folgt...
+Image bauen (die Maven Tests laufen beim Build mit):<br/>
+```$ docker build -t m324refcard01 .```
 
+Container starten:<br/>
+```$ docker run -d -p 8080:8080 --name refcard01 m324refcard01```
 
+Oder direkt das fertige Image von Docker Hub nehmen:<br/>
+```$ docker run -d -p 8080:8080 aledog007/m324refcard01:latest```
 
-
-
+### CI/CD mit GitHub Actions
+Bei jedem Push auf main baut der Workflow `.github/workflows/docker-publish.yml` das Image, startet einen Testcontainer
+und prüft die Seite und die API mit curl. Wenn alles ok ist, wird das Image mit den Tags `latest` und dem Commit-SHA
+auf Docker Hub gepusht. Dafür braucht es im Repo die Secrets `DOCKERHUB_USERNAME` und `DOCKERHUB_TOKEN`.

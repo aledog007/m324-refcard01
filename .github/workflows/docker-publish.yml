@@ -1,0 +1,53 @@
+name: Build and Push Docker Image to Docker Hub
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: aledog007/m324refcard01
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Docker Buildx einrichten
+        uses: docker/setup-buildx-action@v3
+
+      - name: Image bauen (inkl. Maven Tests)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: refcard01:test
+
+      - name: Container starten und testen
+        run: |
+          docker run -d --name refcard01 -p 8080:8080 refcard01:test
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:8080 > /dev/null; then break; fi
+            sleep 2
+          done
+          curl -sf http://localhost:8080 | grep "Application Ref. Card 01"
+          curl -sf http://localhost:8080/api | grep "API hello"
+          docker rm -f refcard01
+
+      - name: Login bei Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Image auf Docker Hub pushen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
