@@ -4,7 +4,7 @@ WORKDIR /app
 COPY pom.xml .
 RUN mvn -q dependency:go-offline
 COPY src ./src
-RUN mvn -q package
+RUN mvn package
 
 # Stage 2: nur das jar in ein kleines JRE Image kopieren
 FROM eclipse-temurin:21-jre-alpine
