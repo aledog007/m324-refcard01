@@ -1,0 +1,54 @@
+name: Build, Test and Push Docker Image to AWS ECR
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  ECR_REPOSITORY: m324-refcard01
+
+jobs:
+  build-test-push-ecr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Docker Buildx einrichten
+        uses: docker/setup-buildx-action@v3
+
+      - name: Image bauen (inkl. Maven Tests)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: refcard01:test
+
+      - name: Container starten und testen
+        run: |
+          docker run -d --name refcard01 -p 8080:8080 refcard01:test
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:8080 > /dev/null; then break; fi
+            sleep 2
+          done
+          curl -sf http://localhost:8080 | grep "Application Ref. Card 01"
+          curl -sf http://localhost:8080/api | grep "API hello"
+          docker rm -f refcard01
+
+      - name: Login bei Amazon ECR mit gespeichertem Token (ECR_TOKEN)
+        env:
+          ECR_TOKEN: ${{ secrets.ECR_TOKEN }}
+        run: |
+          echo "$ECR_TOKEN" | docker login --username AWS --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+      - name: Image taggen und auf ECR pushen
+        run: |
+          ECR_IMAGE=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}
+          docker tag refcard01:test $ECR_IMAGE:latest
+          docker tag refcard01:test $ECR_IMAGE:${{ github.sha }}
+          docker push $ECR_IMAGE:latest
+          docker push $ECR_IMAGE:${{ github.sha }}
